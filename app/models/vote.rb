@@ -1,5 +1,42 @@
 class Vote < ActiveRecord::Base
   belongs_to :user
+
+  validates_inclusion_of :value, in: %w[up down]
+  validates_uniqueness_of :user_id, scope: :entry_id
+  validates_presence_of :entry_id
+  validates_presence_of :user_id
+
+  scope :up, ->() {where(value: "up")}
+  scope :down, ->() {where(value: "down")}
+  scope :user_id, ->(user_id) { where(user_id: user_id) }
+  scope :entry_id, ->(entry_id) { where(entry_id: entry_id) }
+
+  def self.create_or_update(attributes)
+    vote = Vote.where(user_id: attributes[:user_id],entry_id: attributes[:entry_id]).first
+    if vote
+      vote.value = attributes[:value]
+      vote.save
+      vote
+    else
+      Vote.create(attributes)
+    end
+  end
+
+  def self.voted_up_for_user_id(user_id, page, per_page=25)
+    entry_ids_for_user(user_id, "up", page,per_page)
+  end
+
+  def self.voted_down_for_user_id(user_id, page, per_page=25)
+    entry_ids_for_user(user_id, "down", page,per_page)
+  end
+
+  def self.entry_ids_for_user(user_id, value, page, per_page)
+    votes = paginate_by_user_id_and_value(
+                user_id, value, page: page, per_page: per_page
+    )
+    votes.map{|vote| vote.entry_id}
+  end
+
 end
 
 class UpVote < Vote
